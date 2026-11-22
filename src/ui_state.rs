@@ -1,0 +1,509 @@
+//! Compatibility adapter for the original, unmodified Nothing X Mac renderer.
+use crate::{
+    device::{Device, Fallback, Key, Value},
+    updater::UpdateStatus,
+};
+use serde_json::{Value as Json, json};
+use std::sync::OnceLock;
+
+pub const EAR_WEB_URL: &str = "https://earweb.bttl.xyz/";
+#[cfg(windows)]
+const ISSUES_NEW_URL: &str = "https://github.com/Threalcocoboy/WinX/issues/new";
+#[cfg(not(windows))]
+const ISSUES_NEW_URL: &str = "https://github.com/nipunyatawara-dev/NothingX-Desktop/issues/new";
+
+fn byte(d: &Device, key: Key) -> Option<u8> {
+    match d.value(key) {
+        Some(Value::Byte(v)) => Some(*v),
+        _ => None,
+    }
+}
+fn flag(d: &Device, key: Key) -> Option<bool> {
+    match d.value(key) {
+        Some(Value::Flag(v)) => Some(*v),
+        _ => None,
+    }
+}
+pub fn mac(address: [u8; 6]) -> String {
+    address
+        .iter()
+        .map(|b| format!("{b:02X}"))
+        .collect::<Vec<_>>()
+        .join("-")
+}
+pub fn snapshot(d: &Device) -> Json {
+    snapshot_with_update(d, &UpdateStatus::Idle)
+}
+
+pub fn update_json(update: &UpdateStatus) -> Json {
+    match update {
+        UpdateStatus::Idle => json!({"status": "idle", "version": null, "message": null}),
+        UpdateStatus::Checking { manual: true } => {
+            json!({"status": "checking", "version": null, "message": null})
+        }
+        UpdateStatus::Checking { manual: false } => {
+            json!({"status": "idle", "version": null, "message": null})
+        }
+        UpdateStatus::UpToDate => json!({"status": "upToDate", "version": null, "message": null}),
+        UpdateStatus::Available(info) => {
+            json!({"status": "available", "version": info.version, "message": null})
+        }
+        UpdateStatus::Downloading { version } => {
+            json!({"status": "downloading", "version": version, "message": null})
+        }
+        UpdateStatus::Verifying { version } => {
+            json!({"status": "verifying", "version": version, "message": null})
+        }
+        UpdateStatus::Installing { version } => {
+            json!({"status": "installing", "version": version, "message": null})
+        }
+        UpdateStatus::OpenedInstaller { version } => {
+            json!({"status": "opened", "version": version, "message": "Opened DMG to install"})
+        }
+        UpdateStatus::Error {
+            message,
+            manual: true,
+        } => json!({"status": "error", "version": null, "message": message}),
+        UpdateStatus::Error { manual: false, .. } => {
+            json!({"status": "idle", "version": null, "message": null})
+        }
+    }
+}
+
+pub fn snapshot_with_update(d: &Device, update: &UpdateStatus) -> Json {
+    let mut caps = match &d.caps {
+        Some(c) => {
+            let mut caps = serde_json::to_value(c).unwrap_or(Json::Null);
+            if let Some(range) = c.eq.gain_range() {
+                caps["eq"]["gainMin"] = json!(range.start());
+                caps["eq"]["gainMax"] = json!(range.end());
+            }
+            caps["bassSteps"] = json!(c.bass_steps);
+            caps["bassLevels"] = if c.bass_steps == 3 {
+                json!([1, 2])
+            } else if c.bass_steps == 5 {
+                json!([1, 2, 3, 4, 5])
+            } else {
+                json!([])
+            };
+            caps
+        }
+        None => {
+            json!({"noiseCancellation":false,"transparency":false,"strengths":[],"adaptive":false,"bassSteps":0,"bassLevels":[],"inEar":false,"lowLatency":false,"ring":"buds","spatialModes":[],"dualConnection":false,"dualRestarts":false,"personalSound":null,"gestures":null,"eq":{"style":"eq","presets":[],"customId":null,"trebleHz":3400}})
+        }
+    };
+    if d.caps.is_none() {
+        caps["gestures"] = Json::Null;
+        caps["ring"] = json!("none");
+    }
+    let battery = d
+        .battery
+        .iter()
+        .filter_map(|(part, b)| {
+            let name = match part {
+                2 => "left",
+                3 => "right",
+                4 => "case",
+                6 => "stereo",
+                _ => return None,
+            };
+            Some((
+                name.to_string(),
+                json!({"level":b.level,"charging":b.charging}),
+            ))
+        })
+        .collect::<serde_json::Map<_, _>>();
+    let mut battery = json!(battery);
+    for key in ["left", "right", "case", "stereo"] {
+        if battery.get(key).is_none() {
+            battery[key] = Json::Null;
+        }
+    }
+    let code = byte(d, Key::Noise);
+    let noise = match code {
+        Some(1..=4) => Some("anc"),
+        Some(5) => Some("off"),
+        Some(7) => Some("transparency"),
+        _ => None,
+    };
+    let strength = match code {
+        Some(1) => Some("high"),
+        Some(2) => Some("mid"),
+        Some(3) => Some("low"),
+        Some(4) => Some("adaptive"),
+        _ => None,
+    };
+    let bass = match d.value(Key::Bass) {
+        Some(Value::Pair(on, wire)) => {
+            let steps = d.caps.as_ref().map_or(5, |c| c.bass_steps);
+            let level = if steps == 3 {
+                if *wire == 10 { 2 } else { 1 }
+            } else {
+                (*wire / 2).clamp(1, 5)
+            };
+            json!({"enabled":*on==1,"level":level})
+        }
+        _ => Json::Null,
+    };
+    let custom = match d.value(Key::CustomEq) {
+        Some(Value::Eq(b)) => json!({"bass":b[0],"mid":b[1],"treble":b[2]}),
+        _ => Json::Null,
+    };
+    let spatial = match d.value(Key::Spatial) {
+        Some(Value::Pair(m, h)) => Some(match (*m, *h) {
+            (_, 1) => "headTracked",
+            (1, _) => "fixed",
+            (2, _) => "concert",
+            (3, _) => "theatre",
+            (4, _) => "game",
+            _ => "off",
+        }),
+        _ => None,
+    };
+    let mut gestures = json!({"left":{},"right":{},"pending":{}});
+    for (side, name) in [(2, "left"), (3, "right")] {
+        for (kind, slot) in [
+            (2, "doubleTap"),
+            (3, "tripleTap"),
+            (7, "tapHold"),
+            (9, "doubleTapHold"),
+        ] {
+            if let Some(value) = byte(d, Key::Gesture(side, kind)) {
+                gestures[name][slot] = json!(value);
+            }
+            if d.is_pending(Key::Gesture(side, kind)) {
+                gestures["pending"][format!("{name}.{slot}")] = json!(true);
+            }
+        }
+    }
+    let (fb_mode, fb_name) = d.fallback();
+    let fallback = json!({
+        "mode": match fb_mode {
+            Fallback::None => "none",
+            Fallback::Unrecognized => "unrecognized",
+            Fallback::Unresponsive => "unresponsive",
+            Fallback::Limited => "limited",
+        },
+        "deviceName": fb_name,
+    });
+    json!({"connected":d.connected,"name":if d.connected{Some(d.name.as_str())}else{None},"battery":battery,"computerLabel":"This computer",
+        "noiseMode":noise,"ancStrength":strength,"noisePending":d.is_pending(Key::Noise),"bass":bass,"bassPending":d.is_pending(Key::Bass),
+        "quick":{"inEar":flag(d,Key::InEar),"lowLatency":flag(d,Key::LowLatency),"personalSound":flag(d,Key::Personal),"spatial":spatial,
+            "pending":{"inEar":d.is_pending(Key::InEar),"lowLatency":d.is_pending(Key::LowLatency),"personalSound":d.is_pending(Key::Personal),"spatial":d.is_pending(Key::Spatial)},
+            "firmware":if d.firmware.is_empty(){None}else{Some(d.firmware.as_str())},"ringing":d.ringing.map(|s|match s{2=>"left",3=>"right",_=>"all"})},
+        "eq":{"preset":byte(d,Key::Preset),"pending":d.is_pending(Key::Preset),"custom":custom},
+        "dual":{"enabled":flag(d,Key::Dual),"pending":d.is_pending(Key::Dual),"devices":d.devices.iter().map(|dev|json!({"mac":mac(dev.address),"name":dev.name,"isSelf":dev.is_self,"isConnected":dev.connected})).collect::<Vec<_>>(),"busyMac":d.dual_busy.map(|(a,_)|mac(a)),"maxConnected":2},
+        "gestures":gestures,"capabilities":caps,"fallback":fallback,"update":update_json(update)})
+}
+
+pub fn issue_url(d: &Device) -> String {
+    let (mode, name) = d.fallback();
+    let device = name
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| {
+            d.connected
+                .then_some(d.name.as_str())
+                .filter(|s| !s.is_empty())
+        })
+        .unwrap_or("Unknown Nothing/CMF device");
+    let title = format!("Device support: {device}");
+    let status = match mode {
+        Fallback::Unrecognized => "Connected in Bluetooth, control channel not recognized",
+        Fallback::Unresponsive => "Connected over Bluetooth, no replies received",
+        Fallback::Limited => "Unlisted model using auto-detected basic controls",
+        Fallback::None => "Connected",
+    };
+    let os = if cfg!(target_os = "macos") {
+        "macOS"
+    } else if cfg!(windows) {
+        "Windows"
+    } else {
+        std::env::consts::OS
+    };
+    let firmware = if d.firmware.is_empty() {
+        "Unknown"
+    } else {
+        d.firmware.as_str()
+    };
+    let body = format!(
+        "Device name: {device}\nApp version: {}\nOS: {os}\nStatus: {status}\nFirmware: {firmware}\n\nWhat happened:\n- \n",
+        env!("CARGO_PKG_VERSION")
+    );
+    format!(
+        "{ISSUES_NEW_URL}?title={}&body={}",
+        percent_encode(&title),
+        percent_encode(&body)
+    )
+}
+
+fn percent_encode(input: &str) -> String {
+    use std::fmt::Write;
+    let mut out = String::with_capacity(input.len() * 2);
+    for b in input.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(char::from(b));
+        } else {
+            let _ = write!(out, "%{b:02X}");
+        }
+    }
+    out
+}
+
+pub fn command(d: &Device, name: &str, args: &[Json]) -> Option<crate::device::Action> {
+    use crate::device::{Action, spatial};
+    let first = args.first()?;
+    let (key, value) = match name {
+        "setNoiseMode" => (
+            Key::Noise,
+            Value::Byte(match first.as_str()? {
+                "anc" => byte(d, Key::Noise)
+                    .filter(|n| (1..=4).contains(n))
+                    .unwrap_or(d.last_anc),
+                "transparency" => 7,
+                "off" => 5,
+                _ => return None,
+            }),
+        ),
+        "setAncStrength" => (
+            Key::Noise,
+            Value::Byte(match first.as_str()? {
+                "high" => 1,
+                "mid" => 2,
+                "low" => 3,
+                "adaptive" => 4,
+                _ => return None,
+            }),
+        ),
+        "setBass" => {
+            let current = match d.value(Key::Bass) {
+                Some(Value::Pair(on, wire)) => (*on, *wire),
+                _ => (0, 2),
+            };
+            let steps = d.caps.as_ref()?.bass_steps;
+            let level = match first.get("level") {
+                Some(value) => Some(u8::try_from(value.as_u64()?).ok()?),
+                None => None,
+            };
+            let on = first
+                .get("enabled")
+                .and_then(Json::as_bool)
+                .map(u8::from)
+                .unwrap_or(current.0);
+            let wire = level
+                .map(|n| {
+                    if steps == 3 {
+                        n.saturating_mul(5)
+                    } else {
+                        n.saturating_mul(2)
+                    }
+                })
+                .unwrap_or(current.1);
+            (
+                Key::Bass,
+                Value::Pair(on, if steps == 3 && on == 0 { 0 } else { wire }),
+            )
+        }
+        "setQuickToggle" => (
+            match first.as_str()? {
+                "inEar" => Key::InEar,
+                "lowLatency" => Key::LowLatency,
+                "personalSound" => Key::Personal,
+                _ => return None,
+            },
+            Value::Flag(args.get(1)?.as_bool()?),
+        ),
+        "setSpatialAudio" => {
+            let (a, b) = spatial(first.as_str()?);
+            (Key::Spatial, Value::Pair(a, b))
+        }
+        "setDualConnection" => (Key::Dual, Value::Flag(first.as_bool()?)),
+        "setEqPreset" => (
+            Key::Preset,
+            Value::Byte(u8::try_from(first.as_u64()?).ok()?),
+        ),
+        "setCustomEq" => {
+            let mut bands = match d.value(Key::CustomEq) {
+                Some(Value::Eq(b)) => *b,
+                _ => [0; 3],
+            };
+            for (i, key) in ["bass", "mid", "treble"].iter().enumerate() {
+                if let Some(n) = first.get(key).and_then(Json::as_i64) {
+                    bands[i] = n.clamp(-6, 6) as i8;
+                }
+            }
+            (Key::CustomEq, Value::Eq(bands))
+        }
+        "ring" => {
+            return Some(if args.get(1)?.as_bool()? {
+                Action::Ring(match first.as_str()? {
+                    "left" => 2,
+                    "right" => 3,
+                    "all" => 6,
+                    _ => return None,
+                })
+            } else {
+                Action::StopRing
+            });
+        }
+        "setDualDevice" => {
+            let bytes = first
+                .as_str()?
+                .split(['-', ':'])
+                .map(|s| u8::from_str_radix(s, 16))
+                .collect::<Result<Vec<_>, _>>()
+                .ok()?;
+            return Some(Action::DualConnect(
+                bytes.try_into().ok()?,
+                args.get(1)?.as_bool()?,
+            ));
+        }
+        "setGesture" | "setGestureNoiseCycle" => {
+            let side = match first.as_str()? {
+                "left" => 2,
+                "right" => 3,
+                _ => return None,
+            };
+            let slot = match args.get(1)?.as_str()? {
+                "doubleTap" => 2,
+                "tripleTap" => 3,
+                "tapHold" => 7,
+                "doubleTapHold" => 9,
+                _ => return None,
+            };
+            let v = args.get(2)?;
+            let code = if name == "setGestureNoiseCycle" {
+                match (
+                    v["anc"].as_bool()?,
+                    v["transparency"].as_bool()?,
+                    v["off"].as_bool()?,
+                ) {
+                    (true, true, true) => 10,
+                    (false, true, true) => 20,
+                    (true, false, true) => 21,
+                    (true, true, false) => 22,
+                    _ => return None,
+                }
+            } else if v.as_str() == Some("noise") {
+                22
+            } else {
+                u8::try_from(v.as_u64()?).ok()?
+            };
+            (Key::Gesture(side, slot), Value::Byte(code))
+        }
+        _ => return None,
+    };
+    Some(Action::Set(key, value))
+}
+
+pub fn appearance() -> Json {
+    static APPEARANCE: OnceLock<Json> = OnceLock::new();
+    APPEARANCE
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../assets/appearance.json"))
+                .expect("embedded appearance")
+        })
+        .clone()
+}
+pub fn init(d: &Device) -> Json {
+    init_with_update(d, &UpdateStatus::Idle)
+}
+pub fn init_with_update(d: &Device, update: &UpdateStatus) -> Json {
+    let mut a = appearance();
+    a["appName"] = json!(crate::APP_NAME);
+    a["device"] = snapshot_with_update(d, update);
+    a
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn original_renderer_receives_complete_model_data() {
+        use crate::protocol;
+        let mut d = Device::default();
+        d.on_connected("CMF Buds 2 Plus".into(), "test".into());
+        d.receive(&protocol::encode(0x4007, &[1, 2, 87], 1).unwrap());
+        let s = snapshot(&d);
+        assert_eq!(s["capabilities"]["gestures"]["sides"]["left"], 2);
+        assert_eq!(s["capabilities"]["eq"]["presets"][0]["key"], "pop");
+        assert_eq!(s["battery"]["left"]["level"], 87);
+        assert!(s["quick"]["pending"]["spatial"].is_boolean());
+    }
+    #[test]
+    fn disconnected_state_has_every_renderer_branch() {
+        let s = snapshot(&Device::default());
+        assert_eq!(s["battery"]["left"], Json::Null);
+        assert_eq!(s["dual"]["devices"], json!([]));
+        assert_eq!(s["capabilities"]["spatialModes"], json!([]));
+        assert_eq!(crate::models::all().len(), 20);
+    }
+    #[test]
+    fn spatial_mode_reports_reach_the_tile_and_confirm_pending_changes() {
+        use crate::{device::Action, protocol};
+        use std::time::Instant;
+        let mut d = Device::default();
+        d.on_connected("CMF Buds 2 Plus".into(), "test".into());
+        assert_eq!(snapshot(&d)["quick"]["spatial"], Json::Null);
+        d.receive(&protocol::encode(0x404f, &[], 1).unwrap());
+        assert_eq!(snapshot(&d)["quick"]["spatial"], Json::Null);
+        for payload in [&[0][..], &[1][..], &[0, 0][..], &[1, 0][..]] {
+            d.receive(&protocol::encode(0x404f, payload, 1).unwrap());
+            assert_eq!(
+                snapshot(&d)["quick"]["spatial"],
+                if payload[0] == 0 { "off" } else { "fixed" }
+            );
+        }
+        d.action(Action::Set(Key::Spatial, Value::Pair(0, 0)), Instant::now());
+        assert!(d.is_pending(Key::Spatial));
+        d.receive(&protocol::encode(0x404f, &[0], 2).unwrap());
+        assert!(!d.is_pending(Key::Spatial));
+        assert_eq!(snapshot(&d)["quick"]["spatial"], "off");
+        d.action(Action::Set(Key::Spatial, Value::Pair(1, 0)), Instant::now());
+        assert!(d.is_pending(Key::Spatial));
+        d.receive(&protocol::encode(0x404f, &[1], 3).unwrap());
+        assert!(!d.is_pending(Key::Spatial));
+        assert_eq!(snapshot(&d)["quick"]["spatial"], "fixed");
+        d.receive(&protocol::encode(0x404f, &[1, 1], 3).unwrap());
+        assert_eq!(snapshot(&d)["quick"]["spatial"], "headTracked");
+    }
+    #[test]
+    fn anc_strength_is_restored_after_switching_mode() {
+        use crate::protocol;
+        use std::time::Instant;
+        let mut d = Device::default();
+        d.on_connected("CMF Buds 2 Plus".into(), "test".into());
+        let now = Instant::now();
+        for (strength, code) in [("adaptive", 4u8), ("low", 3u8)] {
+            let set_strength = command(&d, "setAncStrength", &[json!(strength)]).unwrap();
+            d.action(set_strength, now);
+            d.receive(&protocol::encode(0x401e, &[1, code, 0], 1).unwrap());
+            assert_eq!(d.last_anc, code);
+            let set_off = command(&d, "setNoiseMode", &[json!("off")]).unwrap();
+            d.action(set_off, now);
+            d.receive(&protocol::encode(0x401e, &[1, 5, 0], 2).unwrap());
+            assert_eq!(snapshot(&d)["noiseMode"], "off");
+            let set_anc = command(&d, "setNoiseMode", &[json!("anc")]).unwrap();
+            d.action(set_anc, now);
+            d.receive(&protocol::encode(0x401e, &[1, code, 0], 3).unwrap());
+            assert_eq!(snapshot(&d)["noiseMode"], "anc");
+            assert_eq!(snapshot(&d)["ancStrength"], strength);
+        }
+    }
+    #[test]
+    fn fallback_snapshot_and_issue_url_encode_device_details() {
+        let mut d = Device::default();
+        assert_eq!(snapshot(&d)["fallback"]["mode"], "none");
+
+        d.set_unrecognized(Some("CMF Buds (3)".into()));
+        let s = snapshot(&d);
+        assert_eq!(s["fallback"]["mode"], "unrecognized");
+        assert_eq!(s["fallback"]["deviceName"], "CMF Buds (3)");
+
+        let url = issue_url(&d);
+        assert!(url.starts_with(&format!(
+            "{ISSUES_NEW_URL}?title=Device%20support%3A%20CMF%20Buds%20%283%29&body="
+        )));
+        assert!(!url.contains(' '));
+        assert!(!url.contains('\n'));
+    }
+}

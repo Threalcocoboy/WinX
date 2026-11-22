@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>WinX Settings</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+<body>
+<div id="view-winx-settings" class="winx-settings settings-shell">
+  <aside><header><img src="../assets/winx-logo.png" alt=""><strong>WinX Settings</strong></header><nav aria-label="Settings categories"><button type="button" data-category="general"><i class="sym" data-sym="settings" aria-hidden="true"></i><span>General</span></button><button type="button" data-category="devices"><i class="sym" data-sym="headphones" aria-hidden="true"></i><span>Devices &amp; Bluetooth</span></button><button type="button" data-category="sound"><i class="sym" data-sym="equalizer" aria-hidden="true"></i><span>Sound &amp; Controls</span></button><button type="button" data-category="talk"><i class="sym" data-sym="transparency" aria-hidden="true"></i><span>Talk Mode</span></button><button type="button" data-category="shortcuts"><i class="sym" data-sym="qsLatency" aria-hidden="true"></i><span>Keyboard Shortcuts</span></button><button type="button" data-category="notifications"><i class="sym" data-sym="qsInEar" aria-hidden="true"></i><span>Notifications &amp; Overlays</span></button><button type="button" data-category="appearance"><i class="sym" data-sym="spatial" aria-hidden="true"></i><span>Appearance</span></button><button type="button" data-category="advanced"><i class="sym" data-sym="qsDual" aria-hidden="true"></i><span>Advanced &amp; Diagnostics</span></button><button type="button" data-category="updates"><svg class="update-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M8 1.5v9m-3.5-3.5L8 10.5 11.5 7M2.5 11v2.5h11V11"/></svg><span>Updates</span></button><button type="button" data-category="about"><i class="sym" data-sym="qsPersonalSound" aria-hidden="true"></i><span>About WinX</span></button></nav></aside>
+  <main id="settings-main"><p class="winx-error" id="winx-setting-error" role="status" hidden></p><section data-content="general" hidden><h1 tabindex="-1">General</h1><p class="settings-intro">Manage launch and onboarding.</p><div class="settings-card"><label>Start with Windows <input id="settings-startup" type="checkbox"></label><p>WinX keeps running in the tray when you close Settings.</p><button class="winx-button" id="winx-replay">Replay Onboarding</button> <button class="winx-button" data-route="updates">Open Updates</button></div></section><section data-content="devices" hidden><h1 tabindex="-1">Devices &amp; Bluetooth</h1><p class="settings-intro">Review the current device and refresh Bluetooth discovery.</p><div class="settings-card"><h2 id="settings-device">No device connected</h2><p id="settings-device-status" role="status"></p><p id="settings-capabilities"></p><button class="winx-button" data-route="refresh">Refresh devices</button> <button class="winx-button" data-route="pair">Windows Bluetooth Settings</button></div></section><section data-content="sound" hidden><h1 tabindex="-1">Sound &amp; Controls</h1><p class="settings-intro">Open the earbud controls available for your connected device.</p><div class="settings-card"><button class="winx-button" id="winx-device-settings" data-route="quick">Earbud quick settings</button> <button class="winx-button" data-device data-route="equalizer">Equalizer</button> <button class="winx-button" data-device data-route="controls">Gestures</button></div></section><section data-content="talk" hidden><h1 tabindex="-1">Talk Mode</h1><p class="settings-intro">One shortcut. Hear the world.</p>          <details open id="winx-talk-section">
+            <summary>One shortcut. Hear the world.</summary>
+            <label><span>Enable Talk Mode</span><input type="checkbox" data-talk="enabled"></label>
+            <label><span>Keyboard shortcut</span><button class="winx-button" id="winx-talk-shortcut" type="button">Edit</button></label>
+            <label><span>Target volume <output id="winx-talk-volume"></output></span><input type="range" min="0" max="100" data-talk="volume"></label>
+            <label><span>Apply speech EQ</span><input type="checkbox" data-talk="reduceEq"></label>
+            <label><span>Enable Transparency</span><input type="checkbox" data-talk="transparency"></label>
+            <label><span>Show overlay</span><input type="checkbox" data-talk="overlay"></label>
+            <label><span>Audio fade <output id="winx-talk-fade"></output></span><input type="range" min="100" max="2000" step="50" data-talk="fadeMs"></label>
+            <p class="qs-note" id="winx-talk-status" role="status"></p>
+            <div class="winx-preview">
+              <button class="winx-button" data-preview="talkOn" type="button">Preview overlay</button>
+              <button class="winx-button" id="winx-test-talk" type="button">Activate Talk Mode on device</button>
+            </div>
+          </details>
+<div class="settings-card"><h2>Speech EQ</h2><div class="speech-eq" aria-label="Talk Mode equalizer profile"><div>Bass<strong id="eq-low">Minimum</strong></div><div>Mid<strong id="eq-mid">Maximum</strong></div><div>Treble<strong id="eq-high">Minimum</strong></div></div></div>
+<div class="settings-card"><h2>Recovery &amp; Diagnostics</h2><p id="recovery-state" role="status"></p><button class="winx-button" id="recover-talk">Restore Original Settings / Retry</button> <button class="winx-button" id="archive-talk">Reset Talk Mode State</button><div id="archive-confirm" hidden><p>Archive these recovery records and keep the current device and volume settings. WinX will stop attempting to restore the saved values.</p><button class="winx-button" id="archive-yes">Archive recovery records</button> <button class="winx-button" id="archive-no">Cancel</button></div></div></section><section data-content="shortcuts" hidden><h1 tabindex="-1">Keyboard Shortcuts</h1><p class="settings-intro">Set global shortcuts and resolve assignment conflicts.</p>          <details open>
+            <summary>Keyboard shortcuts</summary>
+            <label><span>Enable global hotkeys</span><input type="checkbox" id="winx-hotkeys"></label>
+            <div id="winx-shortcuts"></div>
+            <p class="qs-note">Remove your earbuds before using a ring shortcut.</p>
+            <button class="winx-button" id="winx-reset-hotkeys" type="button">Reset to defaults</button>
+          </details>
+</section><section data-content="notifications" hidden><h1 tabindex="-1">Notifications &amp; Overlays</h1><p class="settings-intro">Choose which events WinX shows and where the overlays appear.</p>          <details open>
+            <summary>Overlay</summary>
+            <label><span>Enable overlay</span><input type="checkbox" data-overlay="enabled"></label>
+            <label><span>Show Connected Popup</span><input type="checkbox" data-overlay="connected"></label>
+            <label><span>Show Disconnected Popup</span><input type="checkbox" data-overlay="disconnected"></label>
+            <label><span>Noise control changes</span><input type="checkbox" data-overlay="noise"></label>
+            <label><span>Other control changes</span><input type="checkbox" data-overlay="controls"></label>
+            <fieldset class="winx-positions">
+              <legend>Overlay position</legend>
+              <label><input type="radio" name="winx-pos" value="topLeft"><span>Top Left</span></label>
+              <label><input type="radio" name="winx-pos" value="topCenter"><span>Top Center</span></label>
+              <label><input type="radio" name="winx-pos" value="topRight"><span>Top Right</span></label>
+              <label><input type="radio" name="winx-pos" value="bottomLeft"><span>Bottom Left</span></label>
+              <label><input type="radio" name="winx-pos" value="bottomCenter"><span>Bottom Center</span></label>
+              <label><input type="radio" name="winx-pos" value="bottomRight"><span>Bottom Right</span></label>
+            </fieldset>
+            <label><span>Monitor</span><select data-overlay="monitor"></select></label>
+            <label><span>Duration</span><select data-overlay="seconds"><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option></select></label>
+            <label><span>Size</span><select data-overlay="size"><option value="compact">Compact</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
+            <label><span>Appearance</span><select data-overlay="appearance"><option value="system">Match Windows</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <div class="winx-preview">
+              <select id="winx-preview-action" aria-label="Notification to preview"></select>
+              <button class="winx-button" id="winx-show-preview" type="button">Preview</button>
+            </div>
+          </details>
+          <details>
+            <summary>Media Controls</summary>
+            <label><span>Show Play/Pause Overlays</span><input type="checkbox" data-media="playPause"></label>
+            <label><span>Show Next/Previous Track</span><input type="checkbox" data-media="track"></label>
+            <label><span>Show Volume Changes</span><input type="checkbox" data-media="volume"></label>
+            <p class="qs-note">Media overlays require an identifiable hardware control and a connected Nothing or CMF device.</p>
+          </details>
+          <details>
+            <summary>Battery alerts</summary>
+            <label><span>Enable battery alerts</span><input type="checkbox" data-battery="enabled"></label>
+            <label><span>Low battery (%)</span><input type="number" min="1" max="100" data-threshold="0"></label>
+            <label><span>Very low battery (%)</span><input type="number" min="1" max="99" data-threshold="1"></label>
+            <label><span>Critical battery (%)</span><input type="number" min="0" max="98" data-threshold="2"></label>
+            <label><span>Left earbud</span><input type="checkbox" data-battery="left"></label>
+            <label><span>Right earbud</span><input type="checkbox" data-battery="right"></label>
+            <label><span>Charging case</span><input type="checkbox" data-battery="case"></label>
+            <label><span>Show low and very low alerts</span><input type="checkbox" data-battery="showLow"></label>
+            <label><span>Show critical alerts</span><input type="checkbox" data-battery="showCritical"></label>
+            <label><span>Combine simultaneous alerts</span><input type="checkbox" data-battery="combine"></label>
+            <label><span>Respect Windows quiet states</span><input type="checkbox" data-battery="quiet"></label>
+            <label><span>Play critical alert sound</span><input type="checkbox" data-battery="sound"></label>
+            <label><span>Alert duration</span><select data-battery="prioritySeconds"><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option></select></label>
+            <div class="winx-preview">
+              <button class="winx-button" data-preview="batteryLow" type="button">Preview low</button>
+              <button class="winx-button" data-preview="batteryCritical" type="button">Preview critical</button>
+            </div>
+          </details>
+</section><section data-content="appearance" hidden><h1 tabindex="-1">Appearance</h1><p class="settings-intro">Choose a theme for this window. Overlay appearance is configured separately.</p><div class="settings-card"><label>Settings theme <select id="settings-theme"><option value="system">Follow Windows</option><option value="light">Light</option><option value="dark">Dark</option></select></label><p>Animations follow your Windows accessibility preferences.</p></div></section><section data-content="advanced" hidden><h1 tabindex="-1">Advanced &amp; Diagnostics</h1><p class="settings-intro">Review local recovery and media detection information.</p><div class="settings-card"><label>Log media-control diagnostics <input id="media-diagnostics" type="checkbox"></label><p>The log records source classifications and playback states. The export includes counts and recovery status.</p><button class="winx-button" id="export-diagnostics">Export diagnostics</button><p id="diagnostics-result" role="status"></p></div></section><section data-content="updates" hidden>
+  <h1 tabindex="-1">Updates</h1>
+  <p class="settings-intro">WinX checks GitHub Releases for new Windows versions.</p>
+  <div class="settings-card">
+    <dl class="update-details">
+      <dt>Current Version</dt><dd id="update-current"></dd>
+      <dt>Latest Version</dt><dd id="update-latest"></dd>
+      <dt>Update Status</dt><dd id="update-status" role="status"></dd>
+      <dt>Last Checked</dt><dd id="update-checked"></dd>
+    </dl>
+    <p id="update-error" role="alert" hidden></p>
+    <div id="update-progress-group" hidden>
+      <label for="update-progress">Download Progress <span id="update-size"></span></label>
+      <progress id="update-progress" max="1" value="0"></progress>
+    </div>
+    <div class="update-actions">
+      <button type="button" class="winx-button" id="update-check">Check for Updates</button>
+      <button type="button" class="winx-button" id="update-download" hidden>Update Now</button>
+      <button type="button" class="winx-button" id="update-release">Open Release on GitHub</button>
+    </div>
+  </div>
+  <div class="settings-card" id="update-consent" hidden>
+    <h2>Install the downloaded update?</h2>
+    <p>WinX verified the release checksum. The official installer is unsigned, and the checksum verifies file integrity. WinX will restore any temporary Talk Mode changes and close before opening Windows Setup.</p>
+    <div class="update-actions">
+      <button type="button" class="winx-button" id="update-confirm">Close WinX and open setup</button>
+      <button type="button" class="winx-button" id="update-cancel">Cancel</button>
+    </div>
+  </div>
+  <div class="settings-card">
+    <h2>Update preferences</h2>
+    <label>Automatically Check for Updates <input type="checkbox" data-update-option="automatic"></label>
+    <label>Notify Me About Updates <input type="checkbox" data-update-option="notify"></label>
+    <label>Include Pre-release Versions <input type="checkbox" data-update-option="prereleases"></label>
+  </div>
+  <div class="settings-card">
+    <h2>Release Notes</h2>
+    <div id="update-notes"></div>
+  </div>
+</section><section data-content="about" hidden><h1 tabindex="-1">About WinX</h1><p class="settings-intro">A Nothing &amp; CMF companion app for Windows.</p><div class="settings-card about-card"><img src="../assets/winx-logo.png" alt=""><div><h2>WinX <span id="settings-version"></span></h2><p>Developed and maintained by <strong>Threalcocoboy</strong>.</p></div></div><div class="settings-card"><h2>Open source credits</h2><p>Based on NothingX Desktop by Nipun Yatawara and contributors, with original app and UI work from Nothing X Mac by Yash Raut and protocol work from Radiance ear-web.</p><p>WinX is an independent, unofficial project and is not affiliated with or endorsed by Nothing Technology Limited.</p><p>WinX stores preferences and optional diagnostics locally. The app and corresponding source are distributed under AGPL-3.0.</p><button class="winx-button" data-route="upstream">NothingX Desktop</button> <button class="winx-button" data-route="earlier">Nothing X Mac</button> <button class="winx-button" data-route="protocol">Radiance ear-web</button> <button class="winx-button" data-route="license">AGPL license</button></div></section></main>
+</div>
+<script src="shortcut-keys.js"></script><script src="update-settings.js"></script><script src="winx-settings.js"></script>
+</body></html>

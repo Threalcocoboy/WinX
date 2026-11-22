@@ -1,0 +1,224 @@
+// Popover view: renders device state pushed from the main process.
+
+const LOW_BATTERY = 20;
+// Created once SF Symbols arrive from main.
+let strengthControl = null;
+let bassControl = null;
+let quickSettings = null;
+let spatialAudio = null;
+let dualConnection = null;
+let controls = null;
+let equalizer = null;
+let productName = 'NothingX Desktop';
+
+// One switch at a time across mode buttons and intensity segments.
+const switchLock = window.createSwitchLock({
+  onToggle: (locked) => document.getElementById('noise-section').classList.toggle('busy', locked),
+});
+
+const $ = (sel) => document.querySelector(sel);
+
+function applySymbols(symbols) {
+  for (const el of document.querySelectorAll('[data-sym]')) {
+    const url = symbols[el.dataset.sym];
+    if (url) el.style.setProperty('--sym', `url("${url}")`);
+  }
+}
+
+function renderHeader(state) {
+  const fb = state.fallback ?? { mode: 'none', deviceName: null };
+  $('#panel').classList.toggle('disconnected', !state.connected);
+  if (state.connected) {
+    $('#device-name').textContent = state.name;
+    $('#device-status').textContent =
+      fb.mode === 'unresponsive'
+        ? 'No response'
+        : fb.mode === 'limited'
+          ? 'Connected · Basic'
+          : 'Connected';
+  } else if (fb.mode === 'unrecognized') {
+    $('#device-name').textContent = fb.deviceName || 'Unknown Earbuds';
+    $('#device-status').textContent = 'Not recognized';
+  } else {
+    $('#device-name').textContent = 'No Earbuds';
+    $('#device-status').textContent = 'Not connected';
+  }
+}
+
+function renderFallback(fallback) {
+  const mode = fallback?.mode ?? 'none';
+  const name = fallback?.deviceName || 'These earbuds';
+  const card = $('#fallback-card');
+  const full = mode === 'unrecognized' || mode === 'unresponsive';
+  $('#panel').classList.toggle('fallback-full', full);
+  card.hidden = mode === 'none';
+  card.classList.toggle('compact', mode === 'limited');
+  if (mode === 'none') return;
+
+  const title = $('#fallback-title');
+  const copy = $('#fallback-copy');
+  const issue = $('#fallback-issue');
+  if (mode === 'unrecognized') {
+    title.textContent = `Couldn't open controls for ${name}`;
+    copy.textContent =
+      `Close other companion apps to free the Bluetooth control channel. ${productName} will retry. For a fallback, open ear (web) in a Chromium browser.`;
+    issue.textContent = 'Report on GitHub';
+  } else if (mode === 'unresponsive') {
+    title.textContent = `${name} isn't responding`;
+    copy.textContent =
+      'Close other companion apps and reconnect your earbuds. You can also try ear (web) in a Chromium browser or report this model on GitHub.';
+    issue.textContent = 'Report on GitHub';
+  } else if (mode === 'limited') {
+    title.textContent = `Basic support for ${name}`;
+    copy.textContent =
+      'Controls were auto-detected. Use ear (web) for extra tuning, or report this model for full support.';
+    issue.textContent = 'Request Support';
+  }
+}
+
+function renderBattery(battery) {
+  const stereoOnly = Boolean(battery.stereo && !battery.left && !battery.right);
+  for (const part of ['left', 'right', 'case', 'stereo']) {
+    const el = $(`.bud[data-part="${part}"]`);
+    const info = battery[part];
+    // No case data (e.g. case closed or out of range): drop the column so the
+    // buds sit centred. Missing buds stay visible but dimmed.
+    el.hidden = part === 'stereo' ? !stereoOnly : part === 'case' ? !info : stereoOnly;
+    el.classList.toggle('unavailable', !info);
+    el.classList.toggle('charging', Boolean(info?.charging));
+    el.classList.toggle('low', Boolean(info && !info.charging && info.level <= LOW_BATTERY));
+    el.querySelector('.pct').textContent = info ? `${info.level}%` : '—';
+    el.querySelector('.fill').style.width = info ? `${info.level}%` : '0';
+  }
+}
+
+function renderNoiseMode(mode) {
+  for (const btn of document.querySelectorAll('.option')) {
+    btn.setAttribute('aria-checked', String(btn.dataset.mode === mode));
+  }
+}
+
+function renderCapabilities(capabilities) {
+  const hasAnc = capabilities.noiseCancellation;
+  const hasNoise = hasAnc || capabilities.transparency;
+  $('#noise-section').hidden = !hasNoise;
+  $('#noise-separator').hidden = !hasNoise;
+  $('.option[data-mode="anc"]').hidden = !hasAnc;
+  $('.option[data-mode="transparency"]').hidden = !capabilities.transparency;
+}
+
+function renderUpdate(update) {
+  const el = $('#app-name');
+  const status = update?.status ?? 'idle';
+  const available = status === 'available';
+  const busy = ['checking', 'downloading', 'verifying', 'installing'].includes(status);
+  el.classList.toggle('update-available', available);
+  el.classList.toggle('update-busy', busy);
+  el.disabled = busy;
+  if (available) {
+    el.textContent = 'There is an update';
+    el.title = update.version ? `Click to install v${update.version}` : 'Click to install update';
+  } else if (status === 'checking') {
+    el.textContent = 'Checking for updates…';
+    el.title = '';
+  } else if (status === 'downloading') {
+    el.textContent = 'Downloading update…';
+    el.title = '';
+  } else if (status === 'verifying') {
+    el.textContent = 'Verifying update…';
+    el.title = '';
+  } else if (status === 'installing') {
+    el.textContent = 'Installing update…';
+    el.title = '';
+  } else if (status === 'upToDate') {
+    el.textContent = 'Up to date';
+    el.title = '';
+  } else if (status === 'opened') {
+    el.textContent = update?.message || 'Opened update DMG';
+    el.title = '';
+  } else if (status === 'error') {
+    el.textContent = update?.message || 'Update check failed';
+    el.title = '';
+  } else {
+    el.textContent = productName;
+    el.title = productName === 'WinX' ? 'Open WinX Updates' : 'Click to check for updates';
+  }
+}
+
+function render(state) {
+  renderHeader(state);
+  renderFallback(state.fallback);
+  renderUpdate(state.update);
+  renderBattery(state.battery);
+  renderCapabilities(state.capabilities);
+  switchLock.sync(state.noisePending);
+  renderNoiseMode(state.noiseMode);
+  strengthControl.render(state);
+  bassControl.render(state);
+  quickSettings.render(state);
+  spatialAudio.render(state);
+  dualConnection.render(state);
+  controls.render(state);
+  equalizer.render(state);
+}
+
+async function main() {
+  const { accent, appName, symbols, device, winxSettings, startOnboarding, talkStatus } = await window.nx.init();
+  if (winxSettings) document.documentElement.dataset.platform = 'windows';
+  productName = appName || productName;
+  document.title = productName;
+  const quit = $('#quit');
+  quit.title = `Quit ${productName}`;
+  quit.setAttribute('aria-label', quit.title);
+  document.documentElement.style.setProperty('--accent', accent);
+  window.nx.onAccent((c) => document.documentElement.style.setProperty('--accent', c));
+  applySymbols(symbols);
+
+  strengthControl = window.createStrengthControl({
+    symbols,
+    lock: switchLock,
+    onChange: (strength) => window.nx.setAncStrength(strength),
+  });
+  bassControl = window.createBassControl({
+    symbols,
+    onChange: (change) => window.nx.setBass(change),
+  });
+  const views = window.createViews({ mainId: 'view-main' });
+  const tour = winxSettings ? window.createOnboarding({ api: window.nx, symbols, talkStatus, onExit: () => views.back() }) : null;
+  const preferences = winxSettings ? { open: window.nx.openSettings } : null;
+  window.nx.onRoute(route => {
+    if (route === 'replay') tour?.open();
+    else if (route === 'updates') window.nx.updateAction();
+    else if (route === 'quick') views.open('view-settings');
+    else if (route === 'equalizer') views.open('view-eq');
+    else if (route === 'controls') views.open('view-controls');
+  });
+  if (startOnboarding) tour?.open();
+  quickSettings = window.createQuickSettings({ api: window.nx, views, preferences });
+  spatialAudio = window.createSpatialAudioTile({ api: window.nx, views });
+  dualConnection = window.createDualConnectionTile({ api: window.nx, symbols });
+  controls = window.createControls({ api: window.nx, views, symbols });
+  equalizer = window.createEqualizer({ api: window.nx, views, symbols });
+
+  window.nx.onDeviceState(render);
+  render(device);
+
+  $('#noise-options').addEventListener('click', (e) => {
+    const btn = e.target.closest('.option');
+    if (!btn || switchLock.locked || btn.getAttribute('aria-checked') === 'true') return;
+    switchLock.lock(); // no more changes until the buds confirm this one
+    renderNoiseMode(btn.dataset.mode); // optimistic; device state confirms
+    window.nx.setNoiseMode(btn.dataset.mode);
+  });
+
+  quit.addEventListener('click', () => window.nx.quit());
+  $('#app-name').addEventListener('click', () => window.nx.updateAction());
+  $('#fallback-earweb').addEventListener('click', () => window.nx.openExternal('earWeb'));
+  $('#fallback-issue').addEventListener('click', () => window.nx.openExternal('reportIssue'));
+
+  // Keep the window sized to the content as states change.
+  const panel = $('#panel');
+  new ResizeObserver(() => window.nx.setHeight(panel.getBoundingClientRect().height)).observe(panel);
+}
+
+main();

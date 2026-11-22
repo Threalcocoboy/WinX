@@ -1,0 +1,75 @@
+name: Windows Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: winx-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.95.0
+      - name: Run Windows x64 checks
+        run: ./scripts/check-windows.ps1
+      - name: Package and smoke-test the release
+        env:
+          WINX_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            $env:PATH = (Join-Path ${env:ProgramFiles(x86)} 'NSIS') + ';' + $env:PATH
+          }
+          Get-Command makensis -ErrorAction Stop | Out-Null
+          ./scripts/build-windows.ps1 -ReleaseTag $env:WINX_RELEASE_TAG
+          $version = $env:WINX_RELEASE_TAG.Substring(1)
+          python scripts/verify-windows-package.py $version --smoke
+      - name: Stage verified packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: winx-packages
+          path: |
+            dist/WinX-v*-Setup-x64.exe
+            dist/WinX-v*-Portable-x64.zip
+            dist/WinX-v*-Source.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish:
+    if: github.repository == 'Threalcocoboy/WinX'
+    needs: package
+    runs-on: windows-2022
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: winx-packages
+          path: dist
+      - name: Publish verified artifacts through a draft
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINX_RELEASE_TAG: ${{ github.ref_name }}
+        run: ./scripts/publish-windows.ps1 -Tag $env:WINX_RELEASE_TAG

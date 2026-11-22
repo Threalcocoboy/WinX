@@ -1,0 +1,43 @@
+[package]
+name = "nothingx-desktop"
+version = "1.5.0"
+edition = "2024"
+description = "WinX by Threalcocoboy, an independent Nothing and CMF companion for Windows"
+authors = ["Threalcocoboy", "NothingX Desktop contributors"]
+license = "AGPL-3.0-only"
+repository = "https://github.com/Threalcocoboy/WinX"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tray-icon = { version = "=0.25.1", default-features = false }
+tao = { version = "=0.37.2", default-features = false, features = ["rwh_06"] }
+wry = { version = "=0.57.2", default-features = false, features = ["os-webview"] }
+window-vibrancy = "=0.8.1"
+fs2 = "0.4"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.5"
+objc2-foundation = "0.3.2"
+block2 = "0.6.2"
+objc2-app-kit = { version = "0.3.2", features = ["NSColor", "NSColorSpace", "NSWindow", "NSView", "NSApplication"] }
+
+[target.'cfg(windows)'.dependencies]
+semver = "1"
+sha2 = "0.10"
+url = "2"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Devices_Bluetooth", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Devices_Properties", "Win32_Devices_HumanInterfaceDevice", "Win32_Networking_WinSock", "Win32_System_Registry", "Win32_Security", "Win32_System_Diagnostics_Debug", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_HiDpi", "Win32_UI_Shell", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi"] }
+windows = { version = "0.62.2", features = ["Foundation", "Media_Control", "Win32_Media_Audio_Endpoints", "Win32_UI_Shell_PropertiesSystem", "Win32_Devices_FunctionDiscovery", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_System_WinRT"] }
+windows-future = "0.3.2"
+base64 = "0.23.1"
+png = "0.18"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[build-dependencies]
+winresource = "0.1.34"
