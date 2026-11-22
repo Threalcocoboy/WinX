@@ -258,9 +258,9 @@ impl Panel {
         let url = "nx://app/src/popover/index.html";
         #[cfg(windows)]
         let url = if settings {
-            "http://nx.app/src/popover/settings.html"
+            "https://nx.app/src/popover/settings.html"
         } else {
-            "http://nx.app/src/popover/index.html"
+            "https://nx.app/src/popover/index.html"
         };
         let ipc_proxy = proxy.clone();
         let mut web_context =
@@ -317,7 +317,7 @@ impl Panel {
                     let trusted = request.uri().scheme_str() == Some("nx")
                         && request.uri().host() == Some("app");
                     #[cfg(windows)]
-                    let trusted = request.uri().scheme_str() == Some("http")
+                    let trusted = request.uri().scheme_str() == Some("https")
                         && request.uri().host() == Some("nx.app");
                     if trusted && request.body().len() <= 16_384 {
                         let event = Event::Ipc(request.body().clone());
@@ -335,6 +335,7 @@ impl Panel {
             let builder = {
                 use wry::WebViewBuilderExtWindows;
                 builder
+                    .with_https_scheme(true)
                     .with_browser_accelerator_keys(false)
                     .with_default_context_menus(false)
             };
