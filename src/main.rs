@@ -822,6 +822,10 @@ fn main() {
                                     if args.first().and_then(Json::as_str) == Some("theme") {
                                         apply_settings_theme(window, &result["settings"]["theme"]);
                                     }
+                                    if args.first().and_then(Json::as_str) == Some("accentColor") {
+                                        window.update_accent();
+                                        if let Some(p) = &panel { p.update_accent(); }
+                                    }
                                     result
                                 },
                                 "talkToggle" if exit_after_talk.is_none() && !updates.restoring() => {

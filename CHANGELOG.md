@@ -1,5 +1,10 @@
 # Changelog
 
+## WinX 1.5.1
+
+- Made WinX red the default accent.
+- Added an accent color picker and reset button in Settings → Appearance. WinX remembers the selection and applies it to the tray panel, Settings, and notification accents.
+
 ## WinX 1.5.0
 
 - Added **Settings → Updates**, scheduled and manual release checks, prerelease opt-in, and a native update popup.

@@ -157,6 +157,7 @@ impl Awareness {
         now: Instant,
     ) -> Self {
         let prefs = Preferences::load(&directory);
+        crate::panel::set_accent(prefs.accent());
         crate::media_diagnostics::enable(prefs.media_diagnostics);
         let mut shortcuts = Hotkeys::default();
         shortcuts.sync(&prefs.hotkeys);
@@ -200,7 +201,7 @@ impl Awareness {
             })
             .collect();
         json!({"overlay": self.prefs.overlay, "battery": self.prefs.battery,
-            "theme": self.prefs.settings_theme, "mediaDiagnostics": self.prefs.media_diagnostics,
+            "theme": self.prefs.settings_theme, "accentColor": self.prefs.accent(), "defaultAccent": Preferences::DEFAULT_ACCENT, "mediaDiagnostics": self.prefs.media_diagnostics,
             "talk": self.prefs.talk, "talkStatus": self.talk.status(),
             "hotkeysEnabled": self.prefs.hotkeys.enabled, "shortcuts": shortcuts, "monitors": overlay_windows::monitors(),
             "previews": awareness::PREVIEWS.iter().map(|(action, label)| json!({"action": action, "label": label})).collect::<Vec<_>>()
@@ -213,6 +214,10 @@ impl Awareness {
             return Err("Windows could not save WinX settings.");
         }
         crate::media_diagnostics::enable(candidate.media_diagnostics);
+        if self.prefs.accent() != candidate.accent() {
+            crate::panel::set_accent(candidate.accent());
+            self.visual_settings_changed();
+        }
         self.prefs = candidate;
         Ok(())
     }
@@ -295,6 +300,18 @@ impl Awareness {
                     return Err("Battery thresholds must descend from low to critical.");
                 }
                 candidate.battery = options;
+            }
+            Some("accentColor") => {
+                candidate.accent_color = if value.is_null() {
+                    None
+                } else {
+                    Some(
+                        value
+                            .as_str()
+                            .and_then(Preferences::parse_accent)
+                            .ok_or("Choose a valid accent color.")?,
+                    )
+                };
             }
             Some("theme") => {
                 candidate.settings_theme =

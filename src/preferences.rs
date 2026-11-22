@@ -168,6 +168,7 @@ pub struct Preferences {
     pub hotkeys: crate::hotkeys::Bindings,
     pub talk: crate::talk::Options,
     pub settings_theme: Appearance,
+    pub accent_color: Option<String>,
     pub media_diagnostics: bool,
     pub onboarding_version: u32,
     pub talk_shortcut_initialized: bool,
@@ -176,6 +177,18 @@ pub struct Preferences {
 
 impl Preferences {
     pub const TOUR_VERSION: u32 = 1;
+    pub const DEFAULT_ACCENT: &str = "#e2181c";
+
+    pub fn parse_accent(color: &str) -> Option<String> {
+        (color.len() == 7
+            && color.starts_with('#')
+            && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit))
+        .then(|| color.to_ascii_lowercase())
+    }
+
+    pub fn accent(&self) -> &str {
+        self.accent_color.as_deref().unwrap_or(Self::DEFAULT_ACCENT)
+    }
 
     pub fn should_onboard(directory: &Path) -> bool {
         let path = directory.join("winx-preferences.json");
@@ -218,6 +231,7 @@ impl Preferences {
         if !prefs.battery.valid() {
             prefs.battery = BatteryOptions::default();
         }
+        prefs.accent_color = prefs.accent_color.as_deref().and_then(Self::parse_accent);
         prefs.hotkeys.normalize();
         prefs
     }
@@ -245,6 +259,19 @@ pub fn save_json(path: &Path, value: &impl Serialize) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accent_defaults_to_red_and_accepts_only_rgb_hex() {
+        let mut prefs: Preferences = serde_json::from_str("{}").unwrap();
+        assert_eq!(prefs.accent(), "#e2181c");
+        prefs.accent_color = Preferences::parse_accent("#12ABef");
+        let loaded: Preferences =
+            serde_json::from_value(serde_json::to_value(prefs).unwrap()).unwrap();
+        assert_eq!(loaded.accent(), "#12abef");
+        for invalid in ["red", "#123", "#12345678", "#12g456", " #123456"] {
+            assert!(Preferences::parse_accent(invalid).is_none());
+        }
+    }
 
     #[test]
     fn onboarding_and_talk_migration_preserve_existing_assignments() {

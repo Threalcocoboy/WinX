@@ -1,4 +1,5 @@
 use crate::Event;
+#[cfg(not(windows))]
 use nothingx_desktop::ui_state;
 use serde_json::Value as Json;
 use std::{
@@ -989,6 +990,23 @@ fn update_windows_tray_icon(tray: &TrayIcon, window: &Window) {
     }
     let _ = tray.set_icon(Some(windows_tray_icon(dark)));
 }
+#[cfg(windows)]
+thread_local! {
+    static WINX_ACCENT: std::cell::RefCell<String> =
+        std::cell::RefCell::new(nothingx_desktop::preferences::Preferences::DEFAULT_ACCENT.into());
+}
+
+#[cfg(windows)]
+pub fn set_accent(color: &str) {
+    WINX_ACCENT.with(|accent| color.clone_into(&mut accent.borrow_mut()));
+}
+
+#[cfg(windows)]
+pub fn accent() -> String {
+    WINX_ACCENT.with(|accent| accent.borrow().clone())
+}
+
+#[cfg(not(windows))]
 pub fn accent() -> String {
     #[cfg(target_os = "macos")]
     {
@@ -1002,13 +1020,6 @@ pub fn accent() -> String {
                 (rgb.blueComponent() * 255.).round() as u8
             );
         }
-    }
-    #[cfg(windows)]
-    if let Some(val) = read_hkcu_dword("Software\\Microsoft\\Windows\\DWM", "AccentColor") {
-        let r = (val & 0xff) as u8;
-        let g = ((val >> 8) & 0xff) as u8;
-        let b = ((val >> 16) & 0xff) as u8;
-        return format!("#{r:02x}{g:02x}{b:02x}");
     }
     ui_state::appearance()["accent"]
         .as_str()

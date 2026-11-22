@@ -3,6 +3,9 @@
   const $ = id => document.getElementById(id);
   $('settings-version').textContent = init.version;
   $('settings-startup').checked = init.startup;
+  const setAccent = color => document.documentElement.style.setProperty('--accent', color);
+  setAccent(init.accent);
+  api.onAccent(setAccent);
   for (const icon of document.querySelectorAll('[data-sym]')) {
     icon.style.setProperty('--sym', 'url("' + init.symbols[icon.dataset.sym] + '")');
   }
@@ -144,6 +147,9 @@
     document.getElementById('winx-talk-volume').value = settings.talk.volume + '%';
     document.getElementById('winx-talk-fade').value = settings.talk.fadeMs + ' ms';
     $('settings-theme').value = settings.theme;
+    $('settings-accent').value = settings.accentColor;
+    $('reset-accent').disabled = settings.accentColor === settings.defaultAccent;
+    setAccent(settings.accentColor);
     document.documentElement.dataset.theme = settings.theme;
     $('media-diagnostics').checked = settings.mediaDiagnostics;
     talkState(settings.talkStatus);
@@ -181,6 +187,8 @@
     event.target.checked = result.startup;
     report(result.error);
   });
+  $('settings-accent').addEventListener('change', event => submit('accentColor', event.target.value));
+  $('reset-accent').addEventListener('click', () => submit('accentColor', null));
   $('settings-theme').addEventListener('change', event => submit('theme', event.target.value));
   $('media-diagnostics').addEventListener('change', event => submit('mediaDiagnostics', event.target.checked));
   $('export-diagnostics').addEventListener('click', async () => {

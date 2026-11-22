@@ -51,6 +51,18 @@ if ($release -and -not $release.draft) {
 
 $title = if ($Tag -ceq 'v1.5.0') { "WinX $Tag — Initial Public Release" } else { "WinX $Tag" }
 if (-not $release) {
+    # A release branch can create its tag only after the package job passes.
+    if ($env:GITHUB_REF -ceq "refs/heads/release/$Tag") {
+        $PSNativeCommandUseErrorActionPreference = $false
+        $existing = gh api "repos/$repository/git/ref/tags/$Tag" --jq '.object.sha' 2>$null
+        $lookupExit = $LASTEXITCODE
+        $PSNativeCommandUseErrorActionPreference = $true
+        if ($lookupExit -ne 0) {
+            gh api --method POST "repos/$repository/git/refs" -f "ref=refs/tags/$Tag" -f "sha=$env:GITHUB_SHA" | Out-Null
+        } elseif ($existing -cne $env:GITHUB_SHA) {
+            throw "Tag $Tag already points to a different commit."
+        }
+    }
     $create = @('release', 'create', $Tag, '--repo', $repository, '--verify-tag',
         '--draft', '--title', $title, '--notes-file', $notes)
     if ($preview) { $create += '--prerelease' }

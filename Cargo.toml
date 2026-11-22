@@ -1,6 +1,6 @@
 [package]
 name = "nothingx-desktop"
-version = "1.5.0"
+version = "1.5.1"
 edition = "2024"
 description = "WinX by Threalcocoboy, an independent Nothing and CMF companion for Windows"
 authors = ["Threalcocoboy", "NothingX Desktop contributors"]

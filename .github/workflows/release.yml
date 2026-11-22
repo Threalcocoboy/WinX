@@ -1,6 +1,7 @@
 name: Windows Release
 
 on:
+  create:
   push:
     tags: ['v*']
 
@@ -13,6 +14,7 @@ concurrency:
 
 jobs:
   package:
+    if: github.event_name == 'push' || (github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/v'))
     runs-on: windows-2022
     timeout-minutes: 45
     defaults:
@@ -38,8 +40,9 @@ jobs:
             $env:PATH = (Join-Path ${env:ProgramFiles(x86)} 'NSIS') + ';' + $env:PATH
           }
           Get-Command makensis -ErrorAction Stop | Out-Null
-          ./scripts/build-windows.ps1 -ReleaseTag $env:WINX_RELEASE_TAG
-          $version = $env:WINX_RELEASE_TAG.Substring(1)
+          $tag = $env:WINX_RELEASE_TAG -creplace '^release/', ''
+          ./scripts/build-windows.ps1 -ReleaseTag $tag
+          $version = $tag.Substring(1)
           python scripts/verify-windows-package.py $version --smoke
       - name: Stage verified packages
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -72,4 +75,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           WINX_RELEASE_TAG: ${{ github.ref_name }}
-        run: ./scripts/publish-windows.ps1 -Tag $env:WINX_RELEASE_TAG
+        run: |
+          $tag = $env:WINX_RELEASE_TAG -creplace '^release/', ''
+          ./scripts/publish-windows.ps1 -Tag $tag

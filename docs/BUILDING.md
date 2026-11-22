@@ -26,6 +26,8 @@ Application and packaging metadata come from the Cargo package version. Use a Se
 
 The editable hero animation is in [assets/branding](../assets/branding/). Install Pillow 11.3.0 and imageio-ffmpeg 0.6.0 into a Python environment and run `python assets/branding/render-logo-morph.py`. It uses the Segoe UI fonts from Windows by default.
 
+As an alternative to pushing a tag, create a `release/vVERSION` branch at the intended commit after this workflow is on the default branch. The publication job creates the matching tag after the package checks pass.
+
 ## GitHub project settings
 
 The distribution repository is **Threalcocoboy/WinX**. Use public visibility with Issues and Actions enabled. Set the description to “An unofficial Nothing & CMF companion app for Windows. Lightweight, customizable, and built for a better desktop experience.” Enable private vulnerability reporting in the repository's security settings.
