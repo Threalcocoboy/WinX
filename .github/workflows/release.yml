@@ -4,6 +4,7 @@ on:
   create:
   push:
     tags: ['v*']
+    branches: ['release/v*']
 
 permissions:
   contents: read

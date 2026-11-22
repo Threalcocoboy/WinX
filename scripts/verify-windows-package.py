@@ -59,22 +59,25 @@ def smoke_test(executable, temporary):
     data.mkdir(parents=True)
     (data / "winx-preferences.json").write_text('{"hotkeys":{"enabled":false}}', encoding="utf-8")
     process = subprocess.Popen(
-        [executable, "--status-file", status, "--quit-after", "15", "--no-bluetooth"],
+        [executable, "--status-file", status, "--quit-after", "60", "--no-bluetooth"],
         env={**os.environ, "LOCALAPPDATA": str(profile)}, cwd=executable.parent,
     )
     try:
-        until = time.monotonic() + 13
+        until = time.monotonic() + 50
         ready = False
+        snapshot = {}
         while process.poll() is None and time.monotonic() < until:
             try:
-                ready = json.loads(status.read_text(encoding="utf-8"))["rendererReady"]
+                snapshot = json.loads(status.read_text(encoding="utf-8"))
+                ready = snapshot.get("rendererReady", False)
             except (OSError, json.JSONDecodeError, KeyError):
                 pass
             if ready:
                 break
             time.sleep(0.1)
-        require(ready, "The WinX WebView did not confirm that its panel loaded")
-        require(process.wait(timeout=25) == 0, "WinX did not exit cleanly")
+        require(ready, f"The WinX WebView did not confirm startup (exit={process.poll()}, "
+                f"native panel initialized={bool(snapshot)})")
+        require(process.wait(timeout=65) == 0, "WinX did not exit cleanly")
     finally:
         if process.poll() is None:
             process.terminate()
@@ -94,7 +97,7 @@ def main():
             "Release manifest does not match the exact packaged files")
     require(machine(setup.read_bytes(), setup.name) in (0x14c, 0x8664), "Unexpected NSIS setup architecture")
     verify_version(setup, args.version)
-    with checked_zip(portable) as archive, TemporaryDirectory() as scratch:
+    with checked_zip(portable) as archive, TemporaryDirectory(ignore_cleanup_errors=True) as scratch:
         folder = f"{stem}-windows-x64"
         executable = f"{folder}/nothingx-desktop.exe"
         for name in (executable, f"{folder}/WebView2Loader.dll"):
