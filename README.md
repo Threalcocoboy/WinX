@@ -110,12 +110,13 @@ WinX requires no account for device control. Preferences, recovery records, and 
 
 ## Credits
 
-WinX builds on [NothingX Desktop](https://github.com/nipunyatawara-dev/NothingX-Desktop) by Nipun Yatawara and contributors. That project draws on [Nothing X Mac](https://github.com/yashraut362/nothing-x-mac) by Yash Raut, which credits [Radiance ear-web](https://github.com/radiance-project/ear-web) for the protocol and model data. The [third-party notices](THIRD_PARTY.md) preserve the attribution chain.
+The project draws on [Nothing X Mac](https://github.com/yashraut362/nothing-x-mac) by Yash Raut, which credits [Radiance ear-web](https://github.com/radiance-project/ear-web) for the protocol and model data. The [third-party notices](THIRD_PARTY.md) preserve the attribution chain.
 
 ## Disclaimer
 
 WinX is an independent, unofficial project and is not affiliated with or endorsed by Nothing Technology Limited.
 
 ## License
+
 
 WinX is distributed under the [GNU Affero General Public License, version 3 only](LICENSE). The corresponding source ZIP accompanies the Windows artifacts. [Third-party notices](THIRD_PARTY.md)
