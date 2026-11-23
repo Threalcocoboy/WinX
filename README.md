@@ -12,7 +12,7 @@
   <a href="Cargo.toml"><img alt="Project version" src="https://img.shields.io/github/v/tag/Threalcocoboy/WinX?filter=v*.*.*&amp;sort=semver&amp;label=Project%20Version"></a>
 </p>
 
-WinX is an independent Windows companion application for Nothing and CMF audio devices. It brings device controls, customization, and Windows-focused features together in a lightweight tray app. Developed and maintained by **Threalcocoboy**.
+WinX is an independent Windows companion application for Nothing and CMF audio devices. It puts battery levels, noise controls, and settings in the Windows notification area. Developed and maintained by **Threalcocoboy**.
 
 ## Features
 
@@ -28,7 +28,6 @@ WinX is an independent Windows companion application for Nothing and CMF audio d
 
 <p align="center">
   <img src="assets/screenshots/main-panel.png" width="276" alt="WinX tray panel with CMF Buds Pro 2 battery levels and noise control">
-  <img src="assets/screenshots/equalizer.png" width="276" alt="WinX equalizer presets for CMF Buds Pro 2">
 </p>
 
 <p align="center">
@@ -104,12 +103,6 @@ The packaging script builds the optimized binary and writes the installer, porta
 ## Contributing
 
 [Open an issue](https://github.com/Threalcocoboy/WinX/issues/new) for a bug, feature suggestion, or compatibility report. Include your Windows version, WinX version, device model, firmware, and the specific controls you tested. Pull requests are welcome. [Contributing guide](CONTRIBUTING.md)
-
-## Roadmap
-
-- Expand Windows 10 and 11 testing across Nothing and CMF hardware and firmware.
-- Verify installer upgrades, cancellation, and Talk Mode recovery on clean Windows profiles.
-- Add publisher signing for the Windows installer and executable.
 
 ## Privacy
 
